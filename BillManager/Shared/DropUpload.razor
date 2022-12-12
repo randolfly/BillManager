@@ -1,0 +1,115 @@
+﻿@using Microsoft.AspNetCore.Hosting
+@using System.IO
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IWebHostEnvironment HostEnvironment
+
+<div @ref="UploadElement" class="drop-upload">
+    <p>拖放上传文件</p>
+    <InputFile OnChange="OnChange" class="form-control" multiple @ref="InputFile" hidden="true"/>
+</div>
+
+<pre>
+    <code>
+            @UploadStatus
+    </code>
+</pre>
+
+@code {
+
+    [Parameter]
+    public Bill Bill { get; set; }
+
+    private ElementReference UploadElement { get; set; }
+    private InputFile? InputFile { get; set; }
+
+    private DotNetObjectReference<DropUpload>? wrapper;
+
+    private IJSObjectReference? module;
+
+    private IJSObjectReference? dropInstance;
+
+    private string UploadPath { get; set; } = string.Empty;
+    public string UploadStatus { get; set; } = string.Empty;
+
+    private readonly long maxFileSize = 1024 * 1024 * 15;
+
+    private void CreateUploadPath()
+    {
+        string folderRootPath = HostEnvironment.WebRootPath;
+
+        string billYear = Bill.DateTime.ToString("yyyy");
+        string billMonth = Bill.DateTime.ToString("MM");
+
+        UploadPath = Path.Combine(folderRootPath, billYear, billMonth);
+        if (!Directory.Exists(UploadPath)) Directory.CreateDirectory(UploadPath);
+    }
+
+    private async Task OnChange(InputFileChangeEventArgs obj)
+    {
+        CreateUploadPath();
+
+        var i = 0;
+        var selectedFiles = obj.GetMultipleFiles(100);
+        foreach (var item in selectedFiles)
+        {
+            i++;
+            await OnSubmit(item);
+            UploadStatus += Environment.NewLine + $"[{i}]: " + item.Name;
+        }
+    }
+
+    private async Task OnSubmit(IBrowserFile? efile)
+    {
+        if (efile == null) return;
+        string billYear = Bill.DateTime.ToString("yyyy");
+        string billMonth = Bill.DateTime.ToString("MM");
+        var targetFileName = $"{Bill.DateTime:D}_{Bill.Person}_{efile.Name}";
+        var tempFileName = Path.Combine(UploadPath, targetFileName);
+
+        var refFilePath = Path.Combine(billYear, billMonth, targetFileName);
+        Bill.Assets.Add(new Asset()
+        {
+            Bill = Bill,
+            BillId = Bill.Id,
+            FilePath = refFilePath
+        });
+        await using var fs = new FileStream(tempFileName, FileMode.Create);
+        await using var stream = efile.OpenReadStream(maxFileSize);
+        await stream.CopyToAsync(fs);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "/libs/upload/app.js");
+        wrapper = DotNetObjectReference.Create(this);
+        dropInstance = await module.InvokeAsync<IJSObjectReference>("init", wrapper, UploadElement, InputFile!.Element);
+    }
+
+    [JSInvokable]
+    public void DropAlert(string msg)
+    {
+        UploadStatus += Environment.NewLine + "[!Alert!]: " + msg;
+        StateHasChanged();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (dropInstance != null)
+        {
+            await dropInstance.InvokeVoidAsync("dispose");
+            await dropInstance.DisposeAsync();
+        }
+        if (wrapper != null)
+        {
+            wrapper.Dispose();
+        }
+
+        if (module != null)
+        {
+            await module.DisposeAsync();
+        }
+    }
+
+}

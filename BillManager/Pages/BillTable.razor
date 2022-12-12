@@ -1,0 +1,53 @@
+﻿@page "/BillTable"
+@attribute [TabItemOption(Text = "Table")]
+@inject IBillService BillService
+
+<PageTitle>Table</PageTitle>
+
+<h1>订单总览页</h1>
+
+<Table TItem="Bill" Items="Bills" IsPagination="true" PageItemsSource="PageItemsSource"
+       IsStriped="true" IsBordered="true" ShowSkeleton="true" IsMultipleSelect="true"
+       ShowToolbar="true" ShowSearch="true" ShowExtendButtons="true"
+       AutoGenerateColumns="true" EditMode="EditMode.Popup" OnSaveAsync="OnSaveBillAsync">
+    <TableColumns>
+        <TableColumn @bind-Field="@context.Assets">
+            <Template Context="value">
+                <PdfView Assets="@value.Value"/>
+            </Template>
+            <EditTemplate Context="value">
+                <DropUpload Bill="value"></DropUpload>
+            </EditTemplate>
+        </TableColumn>
+        <TableColumn @bind-Field="@context.Detail">
+            <Template Context="value">
+                <MarkdownView MarkdownString="@value.Value"/>
+            </Template>
+        </TableColumn>
+    </TableColumns>
+</Table>
+
+@code
+{
+    private static IEnumerable<int> PageItemsSource => new int[] { 20, 50 };
+    private IEnumerable<Bill> Bills { get; set; }
+
+    protected override async void OnInitialized()
+    {
+        Bills = await BillService.GetBills();
+    }
+
+
+    private async Task<bool> OnSaveBillAsync(Bill bill, ItemChangedType type)
+    {
+        if (type == ItemChangedType.Update)
+        {
+            await BillService.UpdateBill(bill);
+            StateHasChanged();
+            return true;
+        }
+        // Todo 优化更新数据算法
+        StateHasChanged();
+        return type == ItemChangedType.Add && false;
+    }
+}

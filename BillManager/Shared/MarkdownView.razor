@@ -1,0 +1,24 @@
+﻿@using System.Diagnostics.CodeAnalysis
+
+<div class="col-12 col-sm-4 col-lg-auto">
+    <Button OnClick="() => Modal.Toggle()">显示详情</Button>
+    <Modal @ref="Modal" IsCentered="true" IsScrolling="true" IsBackdrop="true">
+        <ModalDialog Size="Size.ExtraLarge" Title="附件预览">
+            <BodyTemplate>
+                <div class="container">
+                    <CherryMarkdown @bind-Value="@MarkdownString" style="height: 400px" IsViewer="true"></CherryMarkdown>
+                </div>
+            </BodyTemplate>
+        </ModalDialog>
+    </Modal>
+</div>
+
+@code {
+
+    [NotNull]
+    private Modal? Modal { get; set; }
+
+    [Parameter]
+    public string? MarkdownString { get; set; }
+
+}
