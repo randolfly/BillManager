@@ -1,4 +1,5 @@
 ﻿@page "/BillTable"
+@using Console = System.Console
 @attribute [TabItemOption(Text = "Table")]
 @inject IBillService BillService
 
@@ -6,23 +7,41 @@
 
 <h1>订单总览页</h1>
 
-<Table TItem="Bill" Items="Bills" IsPagination="true" PageItemsSource="PageItemsSource"
+<Table TItem="Bill" IsPagination="true" PageItemsSource="PageItemsSource"
        IsStriped="true" IsBordered="true" ShowSkeleton="true" IsMultipleSelect="true"
        ShowToolbar="true" ShowSearch="true" ShowExtendButtons="true"
-       AutoGenerateColumns="true" EditMode="EditMode.Popup" OnSaveAsync="OnSaveBillAsync">
+       AutoGenerateColumns="true" OnQueryAsync="@OnQueryAsync" EditMode="EditMode.Popup"
+       OnAddAsync="@OnAddAsync" OnSaveAsync="@OnSaveAsync" OnDeleteAsync="@OnDeleteAsync">
     <TableColumns>
+        <TableColumn @bind-Field="@context.DateTime">
+            <EditTemplate Context="value">
+                <div class="col-12 col-sm-12 col-md-12">
+                    <DateTimePicker @bind-Value="@value.DateTime"/>
+                </div>
+            </EditTemplate>
+        </TableColumn>
+
         <TableColumn @bind-Field="@context.Assets">
             <Template Context="value">
                 <PdfView Assets="@value.Value"/>
             </Template>
             <EditTemplate Context="value">
-                <DropUpload Bill="value"></DropUpload>
+                <div class="col-12 col-sm-6 col-md-6">
+                    <label class="form-label">订单附件</label>
+                    <DropUpload Bill="value"></DropUpload>
+                </div>
             </EditTemplate>
         </TableColumn>
         <TableColumn @bind-Field="@context.Detail">
             <Template Context="value">
                 <MarkdownView MarkdownString="@value.Value"/>
             </Template>
+            <EditTemplate Context="value">
+                <div class="col-6 col-sm-6 col-md-6">
+                    <label class="form-label">订单详情</label>
+                    <CherryMarkdown @bind-Value="@value.Detail" IsViewer="false"></CherryMarkdown>
+                </div>
+            </EditTemplate>
         </TableColumn>
     </TableColumns>
 </Table>
@@ -30,24 +49,73 @@
 @code
 {
     private static IEnumerable<int> PageItemsSource => new int[] { 20, 50 };
-    private IEnumerable<Bill> Bills { get; set; }
 
-    protected override async void OnInitialized()
+    private async Task<QueryData<Bill>> OnQueryAsync(QueryPageOptions options)
     {
-        Bills = await BillService.GetBills();
+        IEnumerable<Bill> items = await BillService.GetBills();
+
+    // 过滤
+        var isFiltered = false;
+        if (options.Filters.Any())
+        {
+            items = items.Where(options.Filters.GetFilterFunc<Bill>());
+            isFiltered = true;
+        }
+
+    // 排序
+        var isSorted = true;
+    // var isSorted = false;
+    // if (!string.IsNullOrEmpty(options.SortName))
+    // {
+    //     var invoker = Foo.GetNameSortFunc();
+    //     items = invoker(items, options.SortName, options.SortOrder);
+    //     isSorted = true;
+    // }
+
+    // 设置记录总数
+        var total = items.Count();
+
+    // 内存分页
+        items = items.Skip((options.PageIndex - 1) * options.PageItems).Take(options.PageItems).ToList();
+
+        return (new QueryData<Bill>()
+        {
+            Items = items,
+            TotalCount = total,
+            IsSorted = isSorted,
+            IsFiltered = isFiltered,
+            IsSearch = true
+        });
     }
 
-
-    private async Task<bool> OnSaveBillAsync(Bill bill, ItemChangedType type)
+    private Task<Bill> OnAddAsync()
     {
-        if (type == ItemChangedType.Update)
+        return Task.FromResult(new Bill
+        {
+            DateTime = DateTime.Now
+        });
+    }
+
+    private async Task<bool> OnSaveAsync(Bill bill, ItemChangedType changedType)
+    {
+        if (changedType == ItemChangedType.Add)
+        {
+            bill.Id = await BillService.GetBillMaxId() + 1;
+            await BillService.AddBill(bill);
+        }
+        else
         {
             await BillService.UpdateBill(bill);
-            StateHasChanged();
-            return true;
         }
-        // Todo 优化更新数据算法
-        StateHasChanged();
-        return type == ItemChangedType.Add && false;
+        return true;
+    }
+
+    private async Task<bool> OnDeleteAsync(IEnumerable<Bill> bills)
+    {
+        foreach (var bill in bills)
+        {
+            await BillService.RemoveBill(bill.Id);
+        }
+        return true;
     }
 }

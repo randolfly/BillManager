@@ -1,12 +1,12 @@
 ﻿@using System.Diagnostics.CodeAnalysis
 
-<div class="col-12 col-sm-4 col-lg-auto">
+<div class="col-12 col-sm-6 col-lg-auto">
     <Button OnClick="() => Modal.Toggle()">显示详情</Button>
     <Modal @ref="Modal" IsCentered="true" IsScrolling="true" IsBackdrop="true">
-        <ModalDialog Size="Size.ExtraLarge" Title="附件预览">
+        <ModalDialog Size="Size.ExtraLarge" Title="详情显示">
             <BodyTemplate>
                 <div class="container">
-                    <CherryMarkdown @bind-Value="@MarkdownString" style="height: 400px" IsViewer="true"></CherryMarkdown>
+                    <CherryMarkdown @bind-Value="@MarkdownString" style="height: 400px" IsViewer="@IsViewer"></CherryMarkdown>
                 </div>
             </BodyTemplate>
         </ModalDialog>
@@ -20,5 +20,8 @@
 
     [Parameter]
     public string? MarkdownString { get; set; }
+
+    [Parameter]
+    public bool IsViewer { get; set; } = true;
 
 }

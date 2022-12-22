@@ -14,12 +14,16 @@ public class BillService : IBillService
         this.dataContext = dataContext;
     }
 
+    public async Task<int> GetBillMaxId()
+    {
+        return await dataContext.Bills.MaxAsync(b => b.Id);
+    }
+
     public async Task<List<Bill>> GetBills()
     {
-        // Todo 注意这里的AsNoTracking，是否可以优化去掉，实现跟踪数据
         return await dataContext.Bills
             .Include(b => b.Assets)
-            .AsNoTracking()
+            // .AsNoTracking()
             .ToListAsync();
     }
 
@@ -39,6 +43,16 @@ public class BillService : IBillService
             .FirstOrDefaultAsync();
     }
 
+    public async Task AddBill(Bill bill)
+    {
+        await dataContext.Bills.AddAsync(bill);
+        await dataContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// remove bill with (<see cref="int"/>) Id
+    /// </summary>
+    /// <param name="billId"></param>
     public async Task RemoveBill(int billId)
     {
         var bill = await dataContext.Bills
@@ -54,7 +68,20 @@ public class BillService : IBillService
 
     public async Task UpdateBill(Bill bill)
     {
-        dataContext.Bills.Update(bill);
-        await dataContext.SaveChangesAsync();
+        var oldItem = await GetBillById(bill.Id);
+        if (oldItem != null)
+        {
+            oldItem.Detail = bill.Detail;
+            oldItem.Assets = bill.Assets;
+            oldItem.Person = bill.Person;
+            oldItem.Brief = bill.Brief;
+            oldItem.Price = bill.Price;
+            oldItem.BillState = bill.BillState;
+            oldItem.DateTime = bill.DateTime;
+            oldItem.RbsType = bill.RbsType;
+
+            dataContext.Bills.Update(oldItem);
+            await dataContext.SaveChangesAsync();
+        }
     }
 }
