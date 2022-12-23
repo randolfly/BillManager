@@ -1,50 +1,45 @@
 ﻿using BillManager.DataContext;
 using BillManager.Models;
 using BillManager.Services.IServices;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MiniExcelLibs;
 
 namespace BillManager.Services;
 
-public class BillService : IBillService
-{
+public class BillService : IBillService {
     private readonly AppDataContext dataContext;
 
-    public BillService(AppDataContext dataContext)
-    {
+    public BillService(AppDataContext dataContext) {
         this.dataContext = dataContext;
     }
 
-    public async Task<int> GetBillMaxId()
-    {
+    public async Task<int> GetBillMaxId() {
         return await dataContext.Bills.MaxAsync(b => b.Id);
     }
 
-    public async Task<List<Bill>> GetBills()
-    {
+    public async Task<List<Bill>> GetBills() {
         return await dataContext.Bills
             .Include(b => b.Assets)
             // .AsNoTracking()
             .ToListAsync();
     }
 
-    public async Task<List<Bill>> GetBillsByPerson(Person person)
-    {
+    public async Task<List<Bill>> GetBillsByPerson(Person person) {
         return await dataContext.Bills
             .Include(b => b.Assets)
             .Where(b => b.Person == person)
             .ToListAsync();
     }
 
-    public async Task<Bill?> GetBillById(int billId)
-    {
+    public async Task<Bill?> GetBillById(int billId) {
         return await dataContext.Bills
             .Include(b => b.Assets)
             .Where(b => b.Id == billId)
             .FirstOrDefaultAsync();
     }
 
-    public async Task AddBill(Bill bill)
-    {
+    public async Task AddBill(Bill bill) {
         await dataContext.Bills.AddAsync(bill);
         await dataContext.SaveChangesAsync();
     }
@@ -53,8 +48,7 @@ public class BillService : IBillService
     /// remove bill with (<see cref="int"/>) Id
     /// </summary>
     /// <param name="billId"></param>
-    public async Task RemoveBill(int billId)
-    {
+    public async Task RemoveBill(int billId) {
         var bill = await dataContext.Bills
             .Include(b => b.Assets)
             .Where(b => b.Id == billId)
@@ -66,8 +60,7 @@ public class BillService : IBillService
         }
     }
 
-    public async Task UpdateBill(Bill bill)
-    {
+    public async Task UpdateBill(Bill bill) {
         var oldItem = await GetBillById(bill.Id);
         if (oldItem != null)
         {
@@ -83,5 +76,21 @@ public class BillService : IBillService
             dataContext.Bills.Update(oldItem);
             await dataContext.SaveChangesAsync();
         }
+    }
+
+    public Task<FileStreamResult> ExportBills(List<Bill> bills) {
+        var values = new[]
+        {
+            new { Column1 = "MiniExcel", Column2 = 1 },
+            new { Column1 = "Github", Column2 = 2 }
+        };
+
+        var memoryStream = new MemoryStream();
+        memoryStream.SaveAs(values);
+        memoryStream.Seek(0, SeekOrigin.Begin);
+        return Task.FromResult(new FileStreamResult(memoryStream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        {
+            FileDownloadName = "demo.xlsx"
+        });
     }
 }

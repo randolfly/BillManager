@@ -1,4 +1,5 @@
 ﻿using BillManager.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace BillManager.Services.IServices;
 
@@ -14,4 +15,6 @@ public interface IBillService
     Task RemoveBill(int billId);
 
     Task UpdateBill(Bill bill);
+
+    Task<FileStreamResult> ExportBills(List<Bill> bills);
 }

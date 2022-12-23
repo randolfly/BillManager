@@ -1,7 +1,8 @@
 ﻿@page "/BillTable"
-@using Console = System.Console
+@using Console=System.Console
 @attribute [TabItemOption(Text = "Table")]
 @inject IBillService BillService
+@inject ToastService ToastService
 
 <PageTitle>Table</PageTitle>
 
@@ -12,6 +13,9 @@
        ShowToolbar="true" ShowSearch="true" ShowExtendButtons="true"
        AutoGenerateColumns="true" OnQueryAsync="@OnQueryAsync" EditMode="EditMode.Popup"
        OnAddAsync="@OnAddAsync" OnSaveAsync="@OnSaveAsync" OnDeleteAsync="@OnDeleteAsync">
+    <TableToolbarTemplate>
+        <TableToolbarButton TItem="Bill" Color="Color.Primary" Icon="fa-fw fa-solid fa-floppy-disk" Text="下载账单" IsAsync OnClickCallback="@DownloadAsync"/>
+    </TableToolbarTemplate>
     <TableColumns>
         <TableColumn @bind-Field="@context.DateTime">
             <EditTemplate Context="value">
@@ -48,10 +52,12 @@
 
 @code
 {
-    private static IEnumerable<int> PageItemsSource => new int[] { 20, 50 };
-
-    private async Task<QueryData<Bill>> OnQueryAsync(QueryPageOptions options)
+    private static IEnumerable<int> PageItemsSource => new int[]
     {
+        20, 50
+    };
+
+    private async Task<QueryData<Bill>> OnQueryAsync(QueryPageOptions options) {
         IEnumerable<Bill> items = await BillService.GetBills();
 
     // 过滤
@@ -88,16 +94,14 @@
         });
     }
 
-    private Task<Bill> OnAddAsync()
-    {
+    private Task<Bill> OnAddAsync() {
         return Task.FromResult(new Bill
         {
             DateTime = DateTime.Now
         });
     }
 
-    private async Task<bool> OnSaveAsync(Bill bill, ItemChangedType changedType)
-    {
+    private async Task<bool> OnSaveAsync(Bill bill, ItemChangedType changedType) {
         if (changedType == ItemChangedType.Add)
         {
             bill.Id = await BillService.GetBillMaxId() + 1;
@@ -110,12 +114,64 @@
         return true;
     }
 
-    private async Task<bool> OnDeleteAsync(IEnumerable<Bill> bills)
-    {
+    private async Task<bool> OnDeleteAsync(IEnumerable<Bill> bills) {
         foreach (var bill in bills)
         {
             await BillService.RemoveBill(bill.Id);
         }
         return true;
     }
+
+    private async Task DownloadAsync(IEnumerable<Bill> bills) {
+    // Construct pop-up window configuration information and perform pop-up window operations
+        var cate = ToastCategory.Information;
+        var title = "开始下载账单";
+        var content = "请选择想要下载的账单";
+        if (bills.Any())
+        {
+            cate = ToastCategory.Success;
+            content = $"选取 {bills.Count()} 笔账单，窗口将会自动关闭";
+        }
+
+        var option = new ToastOption()
+        {
+            Category = cate,
+            Title = title,
+            Content = content,
+        };
+
+    // 弹出 Toast
+        await ToastService.Show(option);
+
+    // If the download item is selected for package download operation
+        if (bills.Any())
+        {
+    // Disable automatic shutdown
+            option.IsAutoHide = false;
+
+    // Start a background process for data processing
+    // Passing Option used to be used to close the popup after the asynchronous operation
+            await MockDownLoadAsync(bills);
+            
+
+    // Close the popup associated with the option
+            option.Close();
+
+    // A pop-up window informs that the download is complete
+            await ToastService.Show(new ToastOption()
+            {
+                Category = ToastCategory.Success,
+                Title = "完成订单下载",
+                Content = "选中订单导出成功",
+            });
+        }
+
+    }
+
+    private async Task MockDownLoadAsync(IEnumerable<Bill> bills) {
+    // It takes 5 seconds to simulate the package download data here
+        await Task.Delay(5000);
+
+    }
+
 }
